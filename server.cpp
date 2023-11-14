@@ -318,6 +318,75 @@ private:
 
 };
 
+template <typename Type>
+class IteratorRange{
+public:
+    IteratorRange(const Type it1, const Type it2) : begin_it_(it1), end_it_(it2){};
+    Type begin() const {
+        return begin_it_;
+    };
+
+    Type end() const {
+        return end_it_;
+    };
+
+    int size() const {
+        return distance(begin_it_, end_it_) + 1;
+    }
+    // ~IteratorRange();
+private:
+    Type begin_it_;
+    Type end_it_;
+};
+
+template <typename Type>
+class Paginator{
+public:
+    Paginator();
+    Paginator(const Type begin_c, const Type end_c, int page_size){
+        auto begin = begin_c;
+        auto end = begin_c;
+        advance(end, page_size);
+        int pages_cnt = ceil((distance(begin, end)*1.0 + 1)/(page_size*1.0));
+        for (int i = 0; i != pages_cnt - 1; ++i){
+            IteratorRange buf(begin, end);
+            pages_.push_back(buf);
+            advance(begin, page_size);
+            advance(end, page_size);
+        }
+        if (begin != end_c) {
+            IteratorRange buf(begin, end_c);
+            pages_.push_back(buf);
+        }
+    };
+    typename vector<IteratorRange<Type>>::const_iterator begin() const{
+        return pages_.cbegin();
+    }
+    typename vector<IteratorRange<Type>>::const_iterator end() const{
+        return pages_.cend();
+    }
+    // ~Paginator();
+private:
+    vector<IteratorRange<Type>> pages_;
+};
+
+ostream& operator << (std::ostream &os, const Document &doc)
+{
+    return os <<"{ document_id = " << doc.id << ", relevance = " << doc.relevance << ", rating = " << doc.rating << " }";
+}
+
+template <typename Type>
+ostream& operator << (std::ostream &os, const IteratorRange<Type> &ir)
+{
+    if (ir.size() != 0){
+        for (auto it = ir.begin(); it != ir.end(); ++it){
+            os << *it;
+        }
+    }
+    return os;
+}
+
+
 // ==================== для примера =========================
 void PrintDocument(const Document& document) {
     cout << "{ "s
@@ -325,13 +394,23 @@ void PrintDocument(const Document& document) {
         << "relevance = "s << document.relevance << ", "s
         << "rating = "s << document.rating << " }"s << endl;
 }
+template <typename Container>
+auto Paginate(const Container& c, size_t page_size) {
+    return Paginator(begin(c), end(c), page_size);
+}
 int main() {
-    try {
-        SearchServer search_server("и в на \x12"s);
-
+    SearchServer search_server("and with"s);
+    search_server.AddDocument(1, "funny pet and nasty rat"s, DocumentStatus::ACTUAL, {7, 2, 7});
+    search_server.AddDocument(2, "funny pet with curly hair"s, DocumentStatus::ACTUAL, {1, 2, 3});
+    search_server.AddDocument(3, "big cat nasty hair"s, DocumentStatus::ACTUAL, {1, 2, 8});
+    search_server.AddDocument(4, "big dog cat Vladislav"s, DocumentStatus::ACTUAL, {1, 3, 2});
+    search_server.AddDocument(5, "big dog hamster Borya"s, DocumentStatus::ACTUAL, {1, 1, 1});
+    const auto search_results = search_server.FindTopDocuments("curly dog"s);
+    int page_size = 2;
+    const auto pages = Paginate(search_results, page_size);
+    // Выводим найденные документы по страницам
+    for (auto page = pages.begin(); page != pages.end(); ++page) {
+        cout << *page << endl;
+        cout << "Page break"s << endl;
     }
-    catch (...) {
-        cout << "поймали ошибку";
-    }
-
 }
